@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
+	"image"
+	"image/jpeg"
 	"io"
 	"log/slog"
 	"net"
@@ -11,6 +13,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/nfnt/resize"
 )
 
 type RequestImage struct {
@@ -34,8 +38,6 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-
-
 	mux.HandleFunc("/thmbnl", thumbnailHandler)
 
 	server := &http.Server{
@@ -80,6 +82,7 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 			"method not allowed",
 			"handler", "thumbnailHandler",
 		)
+
 		return
 	}
 
@@ -89,6 +92,7 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 		logger.Error(
 			"Request body error",
 			"Handler", "thumbnailHandler",
+			"Error", err.Error(),
 		)
 
 		return
@@ -106,36 +110,64 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 
 		return
 	}
-	resizeImage(&requestImage)
-	fmt.Fprintf(writer, fmt.Sprintf("link is %q", requestImage.Link))
 
-	// file, err := os.ReadFile("static/thumbnail/asdasd.png")
-	// if err != nil {
-	// 	logger.Error(
-	// 		"file doesnt exist",
-	// 		"syserr", err.Error(),
-	// 	)
-	// 	return
-	// }
+	originalImageBuffer, format := getImage(&requestImage)
+	resizedImageBuffer := resizeImage(originalImageBuffer, format)
+	buffer := new(bytes.Buffer)
+	err = jpeg.Encode(buffer, resizedImageBuffer, nil)
+	if err != nil {
+		return
+	}
 
-	// writer.WriteHeader(http.StatusOK)
-	// writer.Header().Set("Content-Type", "application/octet-stream")
-	// writer.Write(file)
+    writer.WriteHeader(http.StatusOK)
+    writer.Header().Set("Content-Type", "image/jpeg")
+    writer.Write(buffer.Bytes())
+	logger.Info("image has been send")
+
 	return
 }
 
-func resizeImage(requestImage *RequestImage) {
+func resizeImage(originalImageBuffer image.Image, format string) image.Image {
+	var resizedImage image.Image
+	newWidth := 300
+    ratio := float64(originalImageBuffer.Bounds().Dx()) / float64(newWidth)
+    newHeight := int(float64(originalImageBuffer.Bounds().Dy()) / ratio)
+    resizedImage = resize.Resize(uint(newWidth), uint(newHeight), originalImageBuffer, resize.Lanczos3)
+	return resizedImage
+}
+
+func getImage(requestImage *RequestImage) (image.Image, string) {
 
 	resp, err := http.Get(requestImage.Link)
 	if err != nil {
 		logger.Error(
 			"Error in getting image",
-			"method", resizeImage,
+			"method", "getImage",
 		)
-		return
+		return nil, ""
 	}
 
 	defer resp.Body.Close()
-	fmt.Println(resp)
 
+	imageData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Error(
+			"body is empty",
+			"method", "getImage",
+			"error", err.Error(),
+		)
+		return nil, ""
+	}
+
+	img, format, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		logger.Error(
+			"image decode error",
+			"method", "getImage",
+			"error", err.Error(),
+		)
+		return nil, ""
+	}
+
+	return img, format
 }
