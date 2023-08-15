@@ -121,7 +121,12 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 
     writer.WriteHeader(http.StatusOK)
     writer.Header().Set("Content-Type", "image/jpeg")
-    writer.Write(buffer.Bytes())
+
+	
+	writer.Write(buffer.Bytes())
+    // writer.Write([]byte(buffer.Bytes()))
+	// buffer.WriteTo(writer)
+
 	logger.Info("image has been send")
 
 	return
