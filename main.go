@@ -22,7 +22,7 @@ type RequestImage struct {
 }
 
 var (
-	port string
+	port   string
 	logger *slog.Logger
 )
 
@@ -66,7 +66,7 @@ func main() {
 	)
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT)
-	logger.Info("server stoped with signal", <- ch)
+	logger.Info("server stoped with signal", <-ch)
 }
 
 func initLogger() {
@@ -112,44 +112,40 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	originalImageBuffer, format := getImage(&requestImage)
-	resizedImageBuffer := resizeImage(originalImageBuffer, format)
+	resizedImageBuffer := resizeImage(originalImageBuffer)
 	buffer := new(bytes.Buffer)
 	err = jpeg.Encode(buffer, resizedImageBuffer, nil)
 	if err != nil {
 		return
 	}
 
-    writer.WriteHeader(http.StatusOK)
-    writer.Header().Set("Content-Type", "image/jpeg")
+	writer.WriteHeader(http.StatusOK)
+	writer.Header().Set("Content-Type", "image/jpeg")
 
-	
 	writer.Write(buffer.Bytes())
-    // writer.Write([]byte(buffer.Bytes()))
+	// writer.Write([]byte(buffer.Bytes()))
 	// buffer.WriteTo(writer)
 
 	logger.Info("image has been send")
-
-	return
 }
 
-func resizeImage(originalImageBuffer image.Image, format string) image.Image {
+func resizeImage(originalImageBuffer image.Image) image.Image {
 	var resizedImage image.Image
 	newWidth := 300
-    ratio := float64(originalImageBuffer.Bounds().Dx()) / float64(newWidth)
-    newHeight := int(float64(originalImageBuffer.Bounds().Dy()) / ratio)
-    resizedImage = resize.Resize(uint(newWidth), uint(newHeight), originalImageBuffer, resize.Lanczos3)
+	ratio := float64(originalImageBuffer.Bounds().Dx()) / float64(newWidth)
+	newHeight := int(float64(originalImageBuffer.Bounds().Dy()) / ratio)
+	resizedImage = resize.Resize(uint(newWidth), uint(newHeight), originalImageBuffer, resize.Lanczos3)
 	return resizedImage
 }
 
-func getImage(requestImage *RequestImage) (image.Image, string) {
-
+func getImage(requestImage *RequestImage) (image.Image) {
 	resp, err := http.Get(requestImage.Link)
 	if err != nil {
 		logger.Error(
 			"Error in getting image",
 			"method", "getImage",
 		)
-		return nil, ""
+		return nil
 	}
 
 	defer resp.Body.Close()
@@ -161,18 +157,18 @@ func getImage(requestImage *RequestImage) (image.Image, string) {
 			"method", "getImage",
 			"error", err.Error(),
 		)
-		return nil, ""
+		return nil
 	}
 
-	img, format, err := image.Decode(bytes.NewReader(imageData))
+	img, _, err := image.Decode(bytes.NewReader(imageData))
 	if err != nil {
 		logger.Error(
 			"image decode error",
 			"method", "getImage",
 			"error", err.Error(),
 		)
-		return nil, ""
+		return nil
 	}
 
-	return img, format
+	return img
 }
