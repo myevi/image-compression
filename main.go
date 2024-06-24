@@ -111,7 +111,7 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	originalImageBuffer, format := getImage(&requestImage)
+	originalImageBuffer := getImage(&requestImage)
 	resizedImageBuffer := resizeImage(originalImageBuffer)
 	buffer := new(bytes.Buffer)
 	err = jpeg.Encode(buffer, resizedImageBuffer, nil)
@@ -123,6 +123,7 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "image/jpeg")
 
 	writer.Write(buffer.Bytes())
+	// also possible solutions
 	// writer.Write([]byte(buffer.Bytes()))
 	// buffer.WriteTo(writer)
 
